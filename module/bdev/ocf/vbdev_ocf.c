@@ -618,6 +618,8 @@ io_handle(struct spdk_io_channel *ch, struct spdk_bdev_io *bdev_io)
 		dir = OCF_WRITE;
 		break;
 	case SPDK_BDEV_IO_TYPE_FLUSH:
+		// UCI: patch flush size to zero, to avoid crash in OCF
+		len = offset = 0;
 		dir = OCF_WRITE;
 		break;
 	case SPDK_BDEV_IO_TYPE_UNMAP:
