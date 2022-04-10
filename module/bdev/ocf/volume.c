@@ -88,7 +88,9 @@ vbdev_ocf_volume_io_set_data(struct ocf_io *io, ctx_data_t *data,
 	io_ctx->offset = offset;
 	io_ctx->data = data;
 
-	if (io_ctx->data && offset >= io_ctx->data->size) {
+	// UCI: fix usage of data ptr without size to avoid crash when used with flush
+	assert(io_ctx->data != NULL);
+	if (io_ctx->data->iovs && offset >= io_ctx->data->size) {
 		return -ENOBUFS;
 	}
 
