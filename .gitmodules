@@ -9,7 +9,7 @@
 	url = https://github.com/spdk/isa-l.git
 [submodule "ocf"]
 	path = ocf
-	url = https://github.com/Open-CAS/ocf.git
+	url = ssh://git@gitlab.om.lan:8522/dataiq/open-cas/ocf.git
 [submodule "libvfio-user"]
 	path = libvfio-user
 	url = https://github.com/nutanix/libvfio-user.git

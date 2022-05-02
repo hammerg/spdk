@@ -635,7 +635,7 @@ io_handle(struct spdk_io_channel *ch, struct spdk_bdev_io *bdev_io)
 		flags = OCF_WRITE_FLUSH;
 	}
 
-	io = ocf_core_new_io(vbdev->ocf_core, qctx->queue, offset, len, dir, 0, flags);
+	io = ocf_volume_new_io(ocf_core_get_front_volume(vbdev->ocf_core), qctx->queue, offset, len, dir, 0, flags);
 	if (!io) {
 		err = -ENOMEM;
 		goto fail;
@@ -1025,7 +1025,7 @@ start_cache_cmpl(ocf_cache_t cache, void *priv, int error)
 			    error, vbdev->name);
 
 		if (error == -OCF_ERR_NO_MEM) {
-			ocf_mngt_get_ram_needed(cache, &vbdev->cfg.device, &mem_needed);
+			ocf_mngt_get_ram_needed(cache, &vbdev->cfg.attach.device, &mem_needed);
 
 			SPDK_NOTICELOG("Try to increase hugepage memory size or cache line size. "
 				       "For your configuration:\nDevice size: %"PRIu64" bytes\n"
@@ -1129,9 +1129,9 @@ start_cache(struct vbdev_ocf *vbdev)
 	}
 
 	if (vbdev->cfg.loadq) {
-		ocf_mngt_cache_load(vbdev->ocf_cache, &vbdev->cfg.device, start_cache_cmpl, vbdev);
+		ocf_mngt_cache_load(vbdev->ocf_cache, &vbdev->cfg.attach, start_cache_cmpl, vbdev);
 	} else {
-		ocf_mngt_cache_attach(vbdev->ocf_cache, &vbdev->cfg.device, start_cache_cmpl, vbdev);
+		ocf_mngt_cache_attach(vbdev->ocf_cache, &vbdev->cfg.attach, start_cache_cmpl, vbdev);
 	}
 }
 
@@ -1169,21 +1169,21 @@ init_vbdev_config(struct vbdev_ocf *vbdev)
 	struct vbdev_ocf_config *cfg = &vbdev->cfg;
 
 	/* Initialize OCF defaults first */
-	ocf_mngt_cache_device_config_set_default(&cfg->device);
+	ocf_mngt_cache_attach_config_set_default(&cfg->attach);
 	ocf_mngt_cache_config_set_default(&cfg->cache);
 	ocf_mngt_core_config_set_default(&cfg->core);
 
 	snprintf(cfg->cache.name, sizeof(cfg->cache.name), "%s", vbdev->name);
 	snprintf(cfg->core.name, sizeof(cfg->core.name), "%s", vbdev->core.name);
 
-	cfg->device.open_cores = false;
-	cfg->device.perform_test = false;
-	cfg->device.discard_on_start = false;
+	cfg->attach.open_cores = false;
+	cfg->attach.device.perform_test = false;
+	cfg->attach.discard_on_start = false;
 
 	vbdev->cfg.cache.locked = true;
 
 	cfg->core.volume_type = SPDK_OBJECT;
-	cfg->device.volume_type = SPDK_OBJECT;
+	cfg->attach.device.volume_type = SPDK_OBJECT;
 
 	if (vbdev->cfg.loadq) {
 		/* When doing cache_load(), we need to set try_add to true,
@@ -1193,14 +1193,14 @@ init_vbdev_config(struct vbdev_ocf *vbdev)
 	} else {
 		/* When cache is initialized as new, set force flag to true,
 		 * to ignore warnings about existing metadata */
-		cfg->device.force = true;
+		cfg->attach.force = true;
 	}
 
 	/* Serialize bdev names in OCF UUID to interpret on future loads
 	 * Core UUID is a triple of (core name, vbdev name, cache name)
 	 * Cache UUID is cache bdev name */
-	cfg->device.uuid.size = strlen(vbdev->cache.name) + 1;
-	cfg->device.uuid.data = vbdev->cache.name;
+	cfg->attach.device.uuid.size = strlen(vbdev->cache.name) + 1;
+	cfg->attach.device.uuid.data = vbdev->cache.name;
 
 	snprintf(vbdev->uuid, VBDEV_OCF_MD_MAX_LEN, "%s %s %s",
 		 vbdev->core.name, vbdev->name, vbdev->cache.name);
@@ -1277,7 +1277,7 @@ init_vbdev(const char *vbdev_name,
 		rc = -EINVAL;
 		goto error_free;
 	}
-	vbdev->cfg.device.cache_line_size = set_cache_line_size;
+	vbdev->cfg.attach.cache_line_size = set_cache_line_size;
 	vbdev->cfg.cache.cache_line_size = set_cache_line_size;
 
 	TAILQ_INSERT_TAIL(&g_ocf_vbdev_head, vbdev, tailq);
@@ -1693,7 +1693,7 @@ metadata_probe_cb(void *priv, int rc,
 {
 	struct metadata_probe_ctx *ctx = priv;
 
-	if (rc) {
+	if (1 || rc) {
 		/* -ENODATA means device does not have cache metadata on it */
 		if (rc != -OCF_ERR_NO_METADATA) {
 			ctx->result = rc;
